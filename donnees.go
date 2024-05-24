@@ -20,7 +20,23 @@ const (
 	SpotifyclientSecret = "1f99f3d3b49740939cb2c4fb7eef78a1"
 )
 
-var mongoURI = "mongodb+srv://celine21106:NVwe27nqvJ2TCt1Y@cluster0.chcv8d1.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+// var mongoURI = "mongodb+srv://celine21106:NVwe27nqvJ2TCt1Y@cluster0.chcv8d1.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+
+func constructMongoURI() string {
+    host := os.Getenv("MONGOHOST")
+    port := os.Getenv("MONGOPORT")
+    user := os.Getenv("MONGOUSER")
+    password := os.Getenv("MONGOPASSWORD")
+
+    if host == "" || port == "" || user == "" || password == "" {
+        log.Fatal("MongoDB environment variables not set properly")
+    }
+
+    uri := fmt.Sprintf("mongodb://%s:%s@%s:%s", user, password, host, port)
+    return uri
+}
+
+var mongoURI = constructMongoURI()
 
 // Connexion à la base de données MongoDB
 func connectToMongo() (*mongo.Client, error) {
