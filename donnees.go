@@ -22,21 +22,6 @@ const (
 )
 
 // var mongoURI = "mongodb+srv://celine21106:NVwe27nqvJ2TCt1Y@cluster0.chcv8d1.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
-/*
-func constructMongoURI() string {
-	host := os.Getenv("MONGOHOST")
-	port := os.Getenv("MONGOPORT")
-	user := os.Getenv("MONGOUSER")
-	password := os.Getenv("MONGOPASSWORD")
-
-	if host == "" || port == "" || user == "" || password == "" {
-		log.Fatal("MongoDB environment variables not set properly")
-	}
-
-	uri := fmt.Sprintf("mongodb://%s:%s@%s:%s", user, password, host, port)
-	return uri
-}
-*/
 
 var mongoURI = os.Getenv("MONGO_URI")
 
@@ -64,12 +49,6 @@ type Track struct {
 	Country    string   `json:"country"`
 }
 
-type QuestionCountryTrend struct {
-	Track   string    `json:"track"`
-	Choices [2]string `json:"choices"`
-	Answer  string    `json:"answer"`
-}
-
 type PlaylistCountry struct {
 	PlaylistID string
 	Country    string
@@ -80,19 +59,7 @@ type CountryTracks struct {
 	Tracks  []Track `json:"tracks"`
 }
 
-func createPlaylistCountryList() []PlaylistCountry {
-	list := []PlaylistCountry{
-		{"37i9dQZEVXbIPWwFssbupI", "FR"},
-		{"37i9dQZEVXbLRQDuF5jeBp", "US"},
-		{"37i9dQZEVXbNFJfN1Vw8d9", "ES"},
-		{"37i9dQZEVXbIVYVBNw9D5K", "TK"},
-		{"37i9dQZEVXbKXQ4mDTEBXq", "JP"},
-		{"37i9dQZEVXbJiZcmkrIHGU", "DE"},
-		{"37i9dQZEVXbKyJS56d1pgi", "PT"},
-	}
-	return list
-}
-
+// liste des pays dont on récuperera leur playlist TOP50 officiel de Spotify
 func createTOP50Playlists() []PlaylistCountry {
 	list := []PlaylistCountry{
 		{"37i9dQZEVXbLRQDuF5jeBp", "USA"},
@@ -106,40 +73,7 @@ func createTOP50Playlists() []PlaylistCountry {
 	return list
 }
 
-func saveFromPlaylistCountryList(playlistCountries []PlaylistCountry) error {
-	client, err := connectToMongo()
-	if err != nil {
-		return fmt.Errorf("erreur lors de la connexion à MongoDB: %w", err)
-	}
-	defer client.Disconnect(context.TODO())
-
-	tracksCollection := client.Database("spotifyData").Collection("tracks")
-
-	//vide la collection avant l'insertion des nouveaux documents
-	_, err = tracksCollection.DeleteMany(context.Background(), bson.M{})
-	if err != nil {
-		return fmt.Errorf("erreur lors du vidage de la collection top50: %w", err)
-	}
-
-	for _, pc := range playlistCountries {
-		tracks, err := saveTracksFromPlaylist(pc.PlaylistID, pc.Country)
-		if err != nil {
-			log.Printf("Erreur lors de l'enregistrement pour le pays %s avec la playlist %s: %v", pc.Country, pc.PlaylistID, err)
-			continue
-		}
-
-		// Pour chaque track récupéré, insérez-le dans la collection 'tracks'
-		for _, track := range tracks {
-			_, err := tracksCollection.InsertOne(context.Background(), track)
-			if err != nil {
-				log.Printf("Erreur lors de l'insertion de la track %s dans la collection tracks: %v", track.ID, err)
-			}
-		}
-		fmt.Println("Tracks de la Playlist", pc.Country, "ajoutés à la base de données")
-	}
-	return nil
-}
-
+// sauvegarde les artistes dans la collection artists de MongoDB
 func saveArtists(artistDetails []Artist, artistsCollection *mongo.Collection) error {
 	for _, artist := range artistDetails {
 		_, err := artistsCollection.UpdateOne(
@@ -155,7 +89,8 @@ func saveArtists(artistDetails []Artist, artistsCollection *mongo.Collection) er
 	return nil
 }
 
-func extractArtistNames(artistsData []interface{}) ([]string, []Artist) {
+// extrait les noms et la popularité des artistes
+func extractArtistNameAndPopularity(artistsData []interface{}) ([]string, []Artist) {
 	var artistNames []string
 	var artistDetails []Artist
 	for _, artistData := range artistsData {
@@ -177,6 +112,8 @@ func extractArtistNames(artistsData []interface{}) ([]string, []Artist) {
 	return artistNames, artistDetails
 }
 
+// récupère les pistes d'une playlist Spotify, extrait les détails des pistes
+// et des artistes, et sauvegarde ces informations dans MongoDB
 func saveTracksFromPlaylist(playlistID string, country string) ([]Track, error) {
 	var tracks []Track //pour le retour
 
@@ -193,12 +130,14 @@ func saveTracksFromPlaylist(playlistID string, country string) ([]Track, error) 
 	}
 	req.Header.Add("Authorization", "Bearer "+token)
 
+	//envoi de la requete pour récupérer la liste de tracks dans la playlist
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("erreur lors de l'envoi de la requête: %w", err)
 	}
 	defer resp.Body.Close()
 
+	//lecture de la réponse
 	responseBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("erreur lors de la lecture de la réponse: %w", err)
@@ -222,12 +161,13 @@ func saveTracksFromPlaylist(playlistID string, country string) ([]Track, error) 
 		return nil, fmt.Errorf("impossible de convertir la valeur de 'items' en []interface{}")
 	}
 
+	//parcourt la liste de tracks et extrait les différentes données pour les sauvegarder dans la collection correspondante
 	for _, item := range items {
 		trackMap, ok := item.(map[string]interface{})["track"].(map[string]interface{})
 		if !ok {
 			continue
 		}
-		artistNames, artistDetails := extractArtistNames(trackMap["artists"].([]interface{}))
+		artistNames, artistDetails := extractArtistNameAndPopularity(trackMap["artists"].([]interface{}))
 
 		track := Track{
 			ID:         trackMap["id"].(string),
@@ -246,6 +186,46 @@ func saveTracksFromPlaylist(playlistID string, country string) ([]Track, error) 
 	return tracks, nil
 }
 
+// Fonction principale pour créer et remplir la collection 'top50'
+func saveTop50Playlists(playlists []PlaylistCountry) error {
+	client, err := connectToMongo()
+	if err != nil {
+		return fmt.Errorf("erreur lors de la connexion à MongoDB: %w", err)
+	}
+	defer client.Disconnect(context.TODO())
+
+	top50Collection := client.Database("spotifyData").Collection("top50")
+	//vide la collection 'top50' avant l'insertion des nouveaux documents
+	_, err = top50Collection.DeleteMany(context.Background(), bson.M{})
+	if err != nil {
+		return fmt.Errorf("erreur lors du vidage de la collection top50: %w", err)
+	}
+
+	//récupère les tracks pour chaque playlist et les sauvegarder
+	for _, pc := range playlists {
+		tracks, err := saveTracksFromPlaylist(pc.PlaylistID, pc.Country)
+		if err != nil {
+			log.Printf("Erreur lors de la récupération des tracks pour le pays %s: %v", pc.Country, err)
+			continue
+		}
+
+		//crée un document pour le pays avec sa liste de tracks
+		countryTracks := CountryTracks{
+			Country: pc.Country,
+			Tracks:  tracks,
+		}
+
+		// insére le document dans la collection 'top50'
+		_, err = top50Collection.InsertOne(context.Background(), countryTracks)
+		if err != nil {
+			log.Printf("Erreur lors de l'insertion des tracks pour le pays %s dans la collection top50: %v", pc.Country, err)
+		}
+	}
+
+	return nil
+}
+
+// Met à jour la popularité et genre des artistes dans la collection artists
 func updateArtistsPopularityAndGenre() error {
 
 	client, err := connectToMongo()
@@ -312,7 +292,6 @@ func updateArtistsPopularityAndGenre() error {
 				"genre":      spotifyArtist.Genres,
 			},
 		}
-		//fmt.Println("popularity %d", spotifyArtist.Popularity)
 		filter := bson.M{"id": artist.ID}
 
 		if _, err := artistsCollection.UpdateOne(context.TODO(), filter, update); err != nil {
@@ -320,45 +299,6 @@ func updateArtistsPopularityAndGenre() error {
 		}
 	}
 	fmt.Println("updateArtistsPopularityAndGenre is done!")
-
-	return nil
-}
-
-// Fonction principale pour créer et remplir la collection 'top50'
-func saveTop50Playlists(playlists []PlaylistCountry) error {
-	client, err := connectToMongo()
-	if err != nil {
-		return fmt.Errorf("erreur lors de la connexion à MongoDB: %w", err)
-	}
-	defer client.Disconnect(context.TODO())
-
-	top50Collection := client.Database("spotifyData").Collection("top50")
-	//vide la collection 'top50' avant l'insertion des nouveaux documents
-	_, err = top50Collection.DeleteMany(context.Background(), bson.M{})
-	if err != nil {
-		return fmt.Errorf("erreur lors du vidage de la collection top50: %w", err)
-	}
-
-	//récupère les tracks pour chaque playlist et les sauvegarder
-	for _, pc := range playlists {
-		tracks, err := saveTracksFromPlaylist(pc.PlaylistID, pc.Country)
-		if err != nil {
-			log.Printf("Erreur lors de la récupération des tracks pour le pays %s: %v", pc.Country, err)
-			continue
-		}
-
-		//crée un document pour le pays avec sa liste de tracks
-		countryTracks := CountryTracks{
-			Country: pc.Country,
-			Tracks:  tracks,
-		}
-
-		// insére le document dans la collection 'top50'
-		_, err = top50Collection.InsertOne(context.Background(), countryTracks)
-		if err != nil {
-			log.Printf("Erreur lors de l'insertion des tracks pour le pays %s dans la collection top50: %v", pc.Country, err)
-		}
-	}
 
 	return nil
 }

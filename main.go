@@ -19,7 +19,6 @@ func main() {
 	http.HandleFunc("/signin", signInHandler)
 	http.HandleFunc("/userinfo", userInfoHandler)
 	http.HandleFunc("/topPlayers", topPlayersHandler)
-
 	http.HandleFunc("/generate-question", generateQuizQuestionHandler)
 	http.HandleFunc("/finish-quizz", finishQuizHandler)
 	http.HandleFunc("/get-result", getQuizResultHandler)
@@ -27,8 +26,8 @@ func main() {
 	createIndex()
 
 	//listes des ids
-	playlistsGenerals := createPlaylistCountryList()
 	playlistTop50 := createTOP50Playlists()
+	saveTop50Playlists(playlistTop50)
 
 	//démarre le ticker pour exécuter les fonctions de récupération des données chaque heure
 	go func() {
@@ -42,10 +41,6 @@ func main() {
 				err := saveTop50Playlists(playlistTop50)
 				if err != nil {
 					log.Printf("Erreur lors de la sauvegarde des playlists Top 50: %v", err)
-				}
-				err = saveFromPlaylistCountryList(playlistsGenerals)
-				if err != nil {
-					log.Printf("Erreur lors de la sauvegarde depuis Playlist Country List: %v", err)
 				}
 				err = updateArtistsPopularityAndGenre()
 				if err != nil {
@@ -66,7 +61,6 @@ func createIndex() error {
 	// Connexion à MongoDB
 	client, err := connectToMongo()
 	if err != nil {
-		log.Fatal("Failed to create index:", err)
 		return fmt.Errorf("erreur lors de la connexion à MongoDB: %w", err)
 	}
 	defer client.Disconnect(context.TODO())
@@ -77,8 +71,8 @@ func createIndex() error {
 	}
 	_, err = collection.Indexes().CreateOne(context.Background(), indexModel)
 	if err != nil {
-		log.Fatal("Failed to create index:", err)
+		log.Fatal("Failed to create index for collection classement:", err)
 	}
-	log.Println("Index created successfully")
+	log.Println("Index  for collection classement created successfully")
 	return nil
 }

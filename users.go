@@ -18,7 +18,7 @@ import (
 	"github.com/golang-jwt/jwt"
 )
 
-// Structure pour représenter un utilisateur
+// structure pour représenter un utilisateur
 type User struct {
 	UserID       string        `json:"userID"`
 	Pseudo       string        `json:"pseudo"`
@@ -54,37 +54,37 @@ func generateUniqueUserID() string {
 	return uniqueID
 }
 
+// récupère les joueurs du top 5 du classement
 func getTopPlayers(client *mongo.Client) ([]UserRanking, error) {
 	collection := client.Database("spotTrendQuizzer").Collection("classement")
 
-	// Récupérer tous les utilisateurs triés par score décroissant
+	// Récupère tous les utilisateurs triés par score décroissant
 	cursor, err := collection.Find(context.Background(), bson.D{}, options.Find().SetSort(bson.D{{Key: "scoreTotal", Value: -1}}))
 	if err != nil {
 		return nil, err
 	}
 	defer cursor.Close(context.Background())
 
-	// Parcourir le curseur pour remplir la slice des joueurs
 	var players []UserRanking
 	if err = cursor.All(context.Background(), &players); err != nil {
 		return nil, err
 	}
 
-	// Attribuer des rangs aux joueurs en fonction de leur position dans la liste triée
+	//attribue les rangs aux joueurs en fonction de leur position dans la liste triée
 	currentRank := 1
 	for i := 0; i < len(players); i++ {
-		// Si le score du joueur actuel est différent du score du joueur précédent,
+		//si le score du joueur actuel est différent du score du joueur précédent,
 		// ou si c'est le premier joueur, attribuer le rang actuel
 		if i == 0 || players[i].Score != players[i-1].Score {
 			players[i].Rank = currentRank
 			currentRank++
 		} else {
-			// Si le score est le même, attribuer le même rang que le joueur précédent
+			//si le score est le même, attribuer le même rang que le joueur précédent
 			players[i].Rank = players[i-1].Rank
 		}
 	}
 
-	// Conserver uniquement les meilleurs joueurs jusqu'à la limite de 5 rangs uniques
+	//conserve uniquement les meilleurs joueurs jusqu'à la limite de 5 rangs uniques
 	var topPlayers []UserRanking
 	rankSet := make(map[int]struct{})
 	for _, player := range players {
@@ -101,21 +101,18 @@ func getTopPlayers(client *mongo.Client) ([]UserRanking, error) {
 	return topPlayers, nil
 }
 
-// Créer le token JWT pour l'utilisateur
+// crée le token JWT pour l'utilisateur
 func generateToken(userID string) (string, error) {
-
-	log.Printf("userid recu dans generatetoken %s", userID)
-	// Préparer les claims du token
 	claims := &jwt.StandardClaims{
 		ExpiresAt: time.Now().Add(24 * time.Hour).Unix(),
 		Issuer:    "spotTrendQuizzer",
 		Subject:   userID,
 	}
 
-	// Créer un nouveau token JWT
+	// crée un nouveau token JWT
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
-	// Signer le token avec ta clé secrète
+	// sibne le token avec la clé secrète
 	tokenString, err := token.SignedString(jwtKey)
 	if err != nil {
 		return "", err
@@ -124,11 +121,9 @@ func generateToken(userID string) (string, error) {
 	return tokenString, nil
 }
 
-// getRanking récupère le classement autour d'un utilisateur donné.
+// récupère le classement autour d'un utilisateur donné.
 func getRanking(client *mongo.Client, userID string) ([]UserRanking, error) {
 	collection := client.Database("spotTrendQuizzer").Collection("classement")
-
-	log.Printf("-----Dans classement utilisateur------------")
 
 	// recupere tous les users depuis collection
 	cursor, err := collection.Find(context.Background(), bson.M{})
@@ -142,26 +137,23 @@ func getRanking(client *mongo.Client, userID string) ([]UserRanking, error) {
 		return nil, err
 	}
 
-	// Trier les utilisateurs par score en ordre décroissant
+	// trie les utilisateurs par score en ordre décroissant
 	sort.Slice(users, func(i, j int) bool {
 		return users[i].Score > users[j].Score
 	})
 
-	// Attribuer des rangs aux utilisateurs en fonction de leur position dans la liste triée
+	//attribue des rangs aux utilisateurs en fonction de leur position dans la liste triée
 	currentRank := 1
 	for i := 0; i < len(users); i++ {
-		// Si le score de l'utilisateur actuel est différent du score de l'utilisateur précédent,
-		// ou si c'est le premier utilisateur, attribuer le rang actuel
 		if i == 0 || users[i].Score != users[i-1].Score {
 			users[i].Rank = currentRank
 			currentRank++
 		} else {
-			// Si le score est le même, attribuer le même rang que l'utilisateur précédent
 			users[i].Rank = users[i-1].Rank
 		}
 	}
 
-	// Trouver l'utilisateur actuel
+	//trouve l'utilisateur actuel
 	var currentUser UserRanking
 	for _, user := range users {
 		if user.UserID == userID {
@@ -170,7 +162,7 @@ func getRanking(client *mongo.Client, userID string) ([]UserRanking, error) {
 		}
 	}
 
-	// Trouver l'utilisateur juste avant et juste après l'utilisateur actuel
+	//trouve l'utilisateur juste avant et juste après l'utilisateur actuel
 	var prevUser, nextUser UserRanking
 	for _, user := range users {
 		if user.UserID != currentUser.UserID {
@@ -178,32 +170,32 @@ func getRanking(client *mongo.Client, userID string) ([]UserRanking, error) {
 				prevUser = user
 			} else if user.Rank >= currentUser.Rank+1 {
 				nextUser = user
-				break // On arrête dès que l'utilisateur suivant est trouvé
+				break //arrête dès que l'utilisateur suivant est trouvé
 			}
 		}
 	}
 
-	// Créer le classement autour de l'utilisateur actuel
+	//créer le classement autour de l'utilisateur actuel
 	var ranking []UserRanking
-	if prevUser.Pseudo != "" { // Vérifier si un utilisateur précédent a été trouvé
+	if prevUser.Pseudo != "" {
 		ranking = append(ranking, prevUser)
 	}
 	ranking = append(ranking, currentUser)
-	if nextUser.Pseudo != "" { // Vérifier si un utilisateur suivant a été trouvé
+	if nextUser.Pseudo != "" {
 		ranking = append(ranking, nextUser)
 	}
 
 	return ranking, nil
 }
 
-// Handler pour la requête d'inscription (sign up)
+// --------------- Handler gérant les données de users ---------------------
+
+// Handler pour la requête d'inscription
 func signUpHandler(w http.ResponseWriter, r *http.Request) {
-	// Autoriser les en-têtes, méthodes et origines nécessaires pour CORS
-	w.Header().Set("Access-Control-Allow-Origin", "*") // À ajuster selon vos besoins de sécurité
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 
-	// Gérer la pré-vérification CORS
 	if r.Method == "OPTIONS" {
 		w.WriteHeader(http.StatusOK)
 		return
@@ -217,13 +209,12 @@ func signUpHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Vérifiez si les champs importants sont présents
+	//vérifie si les champs sont bien remplis
 	if newUser.Pseudo == "" || newUser.Password == "" {
 		http.Error(w, "Pseudonyme et mot de passe requis", http.StatusBadRequest)
 		return
 	}
 
-	//Connexion à Mongo
 	client, err := connectToMongo()
 	if err != nil {
 		http.Error(w, "Erreur lors de la connexion à MongoDB", http.StatusInternalServerError)
@@ -233,7 +224,7 @@ func signUpHandler(w http.ResponseWriter, r *http.Request) {
 
 	defer client.Disconnect(context.Background())
 
-	//Vérifie si le pseudonyme est unique
+	//vérifie si le pseudonyme est unique dans la bdd
 	collection := client.Database("spotTrendQuizzer").Collection("users")
 	var existingUser User
 	err = collection.FindOne(context.Background(), bson.M{"pseudo": newUser.Pseudo}).Decode(&existingUser)
@@ -246,18 +237,18 @@ func signUpHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//Génération de l'ID utilisateur unique
+	//génération de l'ID utilisateur unique
 	newUser.UserID = generateUniqueUserID()
 	log.Printf("token genere %s", newUser.UserID)
 
-	//Initialise le tableau de l'historique des scores avec une liste vide
+	//initialise le tableau de l'historique des scores avec une liste vide
 	newUser.ScoreHistory = []string{}
 
-	//Initialisation des champs ScoreTotal et NbDeParties
+	//initialisation des champs ScoreTotal et NbDeParties
 	newUser.ScoreTotal = 0
 	newUser.NbDeParties = 0
 
-	//Ajoute le nouvel utilisateur à la base de données
+	//ajout du nouvel utilisateur dans la collection users
 	_, err = collection.InsertOne(context.Background(), newUser)
 	if err != nil {
 		http.Error(w, "Erreur lors de l'ajout de l'utilisateur à la base de données", http.StatusInternalServerError)
@@ -265,17 +256,14 @@ func signUpHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Insérez maintenant le nouvel utilisateur dans la collection 'classement'
 	classementCollection := client.Database("spotTrendQuizzer").Collection("classement")
-
-	// Créez un objet pour représenter la nouvelle entrée dans la collection 'classement'
 	classementEntry := bson.M{
 		"userId":     newUser.UserID,
 		"pseudo":     newUser.Pseudo,
 		"scoreTotal": newUser.ScoreTotal, // qui est 0 pour un nouvel utilisateur
 	}
 
-	// Insérez l'entrée dans la collection 'classement'
+	//insère maintenant le nouvel utilisateur dans la collection classement
 	_, err = classementCollection.InsertOne(context.Background(), classementEntry)
 	if err != nil {
 		http.Error(w, "Erreur lors de l'ajout de l'utilisateur à la collection de classement", http.StatusInternalServerError)
@@ -284,24 +272,21 @@ func signUpHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Réponse de succès
-	//w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]string{"message": "Utilisateur enregistré avec succès !"})
 }
 
-// Handler pour la requête de connexion (sign in)
+// Handler pour la requête de connexion
 func signInHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 
-	// Gérer la pré-vérification CORS
 	if r.Method == "OPTIONS" {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
 
-	// Décodez les données JSON de la requête de connexion
 	var signInInfo struct {
 		Pseudo   string `json:"pseudo"`
 		Password string `json:"password"`
@@ -312,7 +297,6 @@ func signInHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Connectez-vous à MongoDB
 	client, err := connectToMongo()
 	if err != nil {
 		http.Error(w, "Erreur lors de la connexion à MongoDB", http.StatusInternalServerError)
@@ -321,7 +305,7 @@ func signInHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer client.Disconnect(context.Background())
 
-	// Recherchez l'utilisateur dans la base de données
+	//recherche l'utilisateur dans la base de données
 	collection := client.Database("spotTrendQuizzer").Collection("users")
 	var user User
 	err = collection.FindOne(context.Background(), bson.M{"pseudo": signInInfo.Pseudo, "password": signInInfo.Password}).Decode(&user)
@@ -335,13 +319,6 @@ func signInHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err != nil {
-		http.Error(w, "Erreur lors de la récupération des meilleurs joueurs", http.StatusInternalServerError)
-		log.Println(err)
-		return
-	}
-
-	// Générer le token JWT
 	tokenString, err := generateToken(user.UserID)
 	if err != nil {
 		http.Error(w, "Erreur lors de la creation de token", http.StatusInternalServerError)
@@ -349,7 +326,7 @@ func signInHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Préparer la réponse qui inclut à la fois le token et les topPlayers
+	//prépare la réponse qui inclut à la fois le token et les topPlayers
 	response := struct {
 		Token string `json:"token"`
 	}{
@@ -363,38 +340,30 @@ func signInHandler(w http.ResponseWriter, r *http.Request) {
 
 // Handler pour récupérer les 5 premiers top players for homepage
 func topPlayersHandler(w http.ResponseWriter, r *http.Request) {
-	log.Printf("dans topPlayersHandler ")
-
-	// Set CORS headers
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 
-	// Gérer la pré-vérification CORS
 	if r.Method == "OPTIONS" {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
 
-	// Connectez-vous à MongoDB (ou utilisez une connexion existante)
-	client, err := connectToMongo() // Remplacez ceci par votre fonction de connexion MongoDB réelle
+	client, err := connectToMongo()
 	if err != nil {
 		http.Error(w, "Erreur lors de la connexion à la base de données", http.StatusInternalServerError)
 		return
 	}
 	defer client.Disconnect(context.Background())
 
-	// Obtenez les joueurs du haut du classement
+	//obtient le top5 les joueurs du classement
 	topPlayers, err := getTopPlayers(client)
 	if err != nil {
 		http.Error(w, "Erreur lors de la récupération des joueurs", http.StatusInternalServerError)
 		return
 	}
 
-	// Définissez le content-type de votre réponse
 	w.Header().Set("Content-Type", "application/json")
-
-	// Encodez le slice topPlayers en JSON et écrivez la réponse
 	err = json.NewEncoder(w).Encode(topPlayers)
 	if err != nil {
 		http.Error(w, "Erreur lors de l'encodage des joueurs en JSON", http.StatusInternalServerError)
@@ -403,27 +372,23 @@ func topPlayersHandler(w http.ResponseWriter, r *http.Request) {
 
 // Handler pour récupérer les informations de l'utilisateur
 func userInfoHandler(w http.ResponseWriter, r *http.Request) {
-	// Set CORS headers
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 	w.Header().Set("Access-Control-Allow-Credentials", "true")
 
-	// Check if preflight request
 	if r.Method == "OPTIONS" {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
 	log.Printf("Received token: %s", r.Header.Get("Authorization"))
 
-	// Extraire le token de l'en-tête Authorization
 	tokenHeader := r.Header.Get("Authorization")
 	if tokenHeader == "" {
 		http.Error(w, "Authorization header is required", http.StatusUnauthorized)
 		return
 	}
 
-	// Supposer que le token est précédé par "Bearer "
 	splitToken := strings.Split(tokenHeader, "Bearer ")
 	if len(splitToken) != 2 {
 		http.Error(w, "Invalid Authorization token", http.StatusUnauthorized)
@@ -433,24 +398,17 @@ func userInfoHandler(w http.ResponseWriter, r *http.Request) {
 	tokenString := splitToken[1]
 	claims := &jwt.StandardClaims{}
 
-	// La vérification du token doit être ici.
+	//vérification du token
 	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
 		return jwtKey, nil
 	})
-
-	// Si il y a une erreur de parse ou le token n'est pas valide.
 	if err != nil || !token.Valid {
 		http.Error(w, "Invalid Authorization token", http.StatusUnauthorized)
 		return
 	}
-
-	// Log après le parsing du token.
-	log.Printf("UserID from token: '%s'", claims.Subject)
-
-	userID := strings.TrimSpace(claims.Subject) // Enlevez les espaces de début et de fin.
+	userID := strings.TrimSpace(claims.Subject)
 
 	if _, ok := token.Claims.(*jwt.StandardClaims); ok && token.Valid {
-		log.Printf("UserID from token: '%s'", userID)
 
 		client, err := connectToMongo()
 		if err != nil {
@@ -460,6 +418,7 @@ func userInfoHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		defer client.Disconnect(context.Background())
 
+		//trouve l'utilisateur dans la base de données
 		collection := client.Database("spotTrendQuizzer").Collection("users")
 		var user User
 		err = collection.FindOne(context.Background(), bson.M{"userid": userID}).Decode(&user)
@@ -473,7 +432,7 @@ func userInfoHandler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-		// Obtenez le classement de l'utilisateur
+		//obtient le classement de l'utilisateur
 		ranking, err := getRanking(client, userID)
 		if err != nil {
 			http.Error(w, "Error retrieving user ranking", http.StatusInternalServerError)
@@ -481,7 +440,7 @@ func userInfoHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Préparez une structure de réponse combinée qui comprend les informations de l'utilisateur et son classement
+		//prépare une structure de réponse combinée qui comprend les informations de l'utilisateur et son classement
 		response := struct {
 			UserInfo User          `json:"userInfo"`
 			Ranking  []UserRanking `json:"ranking"`
@@ -490,7 +449,6 @@ func userInfoHandler(w http.ResponseWriter, r *http.Request) {
 			Ranking:  ranking,
 		}
 
-		// Encodez la réponse combinée et envoyez-la au client
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(response)
