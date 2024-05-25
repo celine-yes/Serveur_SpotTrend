@@ -66,6 +66,7 @@ func createIndex() error {
 	// Connexion à MongoDB
 	client, err := connectToMongo()
 	if err != nil {
+		log.Fatal("Failed to create index:", err)
 		return fmt.Errorf("erreur lors de la connexion à MongoDB: %w", err)
 	}
 	defer client.Disconnect(context.TODO())
