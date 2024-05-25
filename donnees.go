@@ -8,8 +8,8 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"strings"
 	"os"
+	"strings"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -22,22 +22,23 @@ const (
 )
 
 // var mongoURI = "mongodb+srv://celine21106:NVwe27nqvJ2TCt1Y@cluster0.chcv8d1.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
-
+/*
 func constructMongoURI() string {
-    host := os.Getenv("MONGOHOST")
-    port := os.Getenv("MONGOPORT")
-    user := os.Getenv("MONGOUSER")
-    password := os.Getenv("MONGOPASSWORD")
+	host := os.Getenv("MONGOHOST")
+	port := os.Getenv("MONGOPORT")
+	user := os.Getenv("MONGOUSER")
+	password := os.Getenv("MONGOPASSWORD")
 
-    if host == "" || port == "" || user == "" || password == "" {
-        log.Fatal("MongoDB environment variables not set properly")
-    }
+	if host == "" || port == "" || user == "" || password == "" {
+		log.Fatal("MongoDB environment variables not set properly")
+	}
 
-    uri := fmt.Sprintf("mongodb://%s:%s@%s:%s", user, password, host, port)
-    return uri
+	uri := fmt.Sprintf("mongodb://%s:%s@%s:%s", user, password, host, port)
+	return uri
 }
+*/
 
-var mongoURI = constructMongoURI()
+var mongoURI = os.Getenv("MONGO_URI")
 
 // Connexion à la base de données MongoDB
 func connectToMongo() (*mongo.Client, error) {
@@ -104,7 +105,6 @@ func createTOP50Playlists() []PlaylistCountry {
 	}
 	return list
 }
-
 
 func saveFromPlaylistCountryList(playlistCountries []PlaylistCountry) error {
 	client, err := connectToMongo()
